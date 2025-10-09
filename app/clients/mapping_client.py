@@ -1,23 +1,46 @@
+from __future__ import annotations
+
 import httpx
+from urllib.parse import quote
 from typing import List
+
 from app.core.config import settings
-from app.models.show_schemas import RequirementRowOut, RequirementDetailOut
+from app.models.schemas import RequirementRowOut, RequirementDetailOut
+
 
 class MappingClient:
-    def __init__(self, base_url: str = str(settings.MAPPING_API_BASE)):
-        # ✅ 끝 슬래시 제거하여 // 방지
-        self.base_url = base_url.rstrip("/")
-        self._client = httpx.Client(timeout=30.0)
+    """
+    Compliance Mapping API (예: localhost:8003) 호출 클라이언트
+    """
 
-    def get_requirements(self, framework_code: str) -> List[RequirementRowOut]:
-        url = f"{self.base_url}/compliance/compliance/{framework_code}/requirements"
-        r = self._client.get(url)
+    def __init__(self, base_url: str | None = None):
+        self.base_url = (base_url or settings.MAPPING_BASE_URL).rstrip("/")
+
+    def _safe_code(self, framework: str) -> str:
+        """
+        프레임워크 코드를 path 세그먼트에 안전하게 넣기 위해:
+        - strip()으로 양끝 공백 제거
+        - quote()로 URL 인코딩
+        """
+        return quote(framework.strip(), safe="")
+
+    def get_requirements(self, framework: str) -> List[RequirementRowOut]:
+        """
+        GET /compliance/compliance/{code}/requirements
+        """
+        code = self._safe_code(framework)
+        url = f"{self.base_url}/compliance/compliance/{code}/requirements"
+        r = httpx.get(url, timeout=30.0)
         r.raise_for_status()
         data = r.json()
-        return [RequirementRowOut.model_validate(x) for x in data]
+        return [RequirementRowOut(**x) for x in data]
 
-    def get_requirement_mappings(self, framework_code: str, req_id: int) -> RequirementDetailOut:
-        url = f"{self.base_url}/compliance/compliance/{framework_code}/requirements/{req_id}/mappings"
-        r = self._client.get(url)
+    def get_requirement_mappings(self, framework: str, req_id: int) -> RequirementDetailOut:
+        """
+        GET /compliance/compliance/{code}/requirements/{req_id}/mappings
+        """
+        code = self._safe_code(framework)
+        url = f"{self.base_url}/compliance/compliance/{code}/requirements/{req_id}/mappings"
+        r = httpx.get(url, timeout=30.0)
         r.raise_for_status()
-        return RequirementDetailOut.model_validate(r.json())
+        return RequirementDetailOut(**r.json())

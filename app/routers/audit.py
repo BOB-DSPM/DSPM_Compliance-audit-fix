@@ -1,3 +1,4 @@
+# app/routers/audit.py
 from fastapi import APIRouter, Path
 from app.services.audit_service import AuditService
 
@@ -7,6 +8,8 @@ router = APIRouter()
 def audit_framework(
     framework: str = Path(..., description="예: ISMS-P / GDPR / iso-27001"),
 ):
+    # 경로 파라미터에 공백(%20 등) 들어온 경우 대비
+    framework = framework.strip()
     svc = AuditService()
     return svc.audit_compliance(framework)
 
@@ -15,5 +18,7 @@ def audit_requirement(
     framework: str = Path(..., description="예: ISMS-P / GDPR / iso-27001"),
     req_id: int = Path(..., description="매핑 백엔드의 requirement.id"),
 ):
+    # 경로 파라미터에 공백(%20 등) 들어온 경우 대비
+    framework = framework.strip()
     svc = AuditService()
     return svc.audit_requirement(framework, req_id)
