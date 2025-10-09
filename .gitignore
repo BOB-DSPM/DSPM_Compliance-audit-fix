@@ -1,0 +1,68 @@
+# ── Python basics ───────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.pyd
+
+# ── Environments ────────────────────────────────────────────────────────────────
+.venv/
+env/
+venv/
+.conda/
+.python-version
+
+# ── OS / Editors ────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.code-workspace
+.history/
+.cache/
+
+# ── Logs & runtime ──────────────────────────────────────────────────────────────
+logs/
+*.log
+uvicorn*.log
+
+# ── Tests / Coverage ────────────────────────────────────────────────────────────
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+nosetests.xml
+.tox/
+.pytype/
+.mypy_cache/
+.ruff_cache/
+
+# ── Packaging / Build ───────────────────────────────────────────────────────────
+build/
+dist/
+pip-wheel-metadata/
+*.egg-info/
+.eggs/
+
+# ── Notebooks ──────────────────────────────────────────────────────────────────
+.ipynb_checkpoints/
+
+# ── Local configs / secrets ─────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+*.local
+*.secret
+*.credentials
+
+# AWS CLI local files (보통은 저장 안 하는 게 안전)
+.aws/
+.aws-sso/cache/
+
+# ── Project-specific (생성물/캐시) ──────────────────────────────────────────────
+# OpenAPI 파일이 "자동 생성"이면 ignore 유지, "버전 관리" 원하면 아래 라인 주석 처리
+openapi.json
+
+# FastAPI docs static exports (필요시만 추적)
+site/
