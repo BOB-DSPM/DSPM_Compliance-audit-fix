@@ -26,10 +26,10 @@ class MappingClient:
 
     def get_requirements(self, framework: str) -> List[RequirementRowOut]:
         """
-        GET /compliance/compliance/{code}/requirements
+        GET /compliance/{code}/requirements
         """
         code = self._safe_code(framework)
-        url = f"{self.base_url}/compliance/compliance/{code}/requirements"
+        url = f"{self.base_url}/compliance/{code}/requirements"
         r = httpx.get(url, timeout=30.0)
         r.raise_for_status()
         data = r.json()
@@ -37,10 +37,10 @@ class MappingClient:
 
     def get_requirement_mappings(self, framework: str, req_id: int) -> RequirementDetailOut:
         """
-        GET /compliance/compliance/{code}/requirements/{req_id}/mappings
+        GET /compliance/{code}/requirements/{req_id}/mappings
         """
         code = self._safe_code(framework)
-        url = f"{self.base_url}/compliance/compliance/{code}/requirements/{req_id}/mappings"
+        url = f"{self.base_url}/compliance/{code}/requirements/{req_id}/mappings"
         r = httpx.get(url, timeout=30.0)
         r.raise_for_status()
         return RequirementDetailOut(**r.json())
