@@ -67,6 +67,10 @@ from app.services.executors.map_12_0_01_privatelink_interface_endpoints import E
 from app.services.executors.map_1_0_04_iam_password_policy import Exec_1_0_04
 from app.services.executors.map_12_0_02_datasync_tasks import Exec_12_0_02
 from app.services.executors.map_9_0_04_s3_replication import Exec_9_0_04
+from app.services.executors.map_6_0_01_sagemaker_endpoints import Exec_6_0_01
+from app.services.executors.map_6_0_02_sagemaker_model_monitor import Exec_6_0_02
+from app.services.executors.map_6_0_03_ecr_scan_on_push import Exec_6_0_03
+from app.services.executors.map_1_0_05_access_analyzer import Exec_1_0_05
 
 
 
@@ -81,6 +85,7 @@ EXECUTOR_REGISTRY: Dict[str, Type[Auditable]] = {
     "1.0-02": Exec_1_0_02,
     "1.0-03": Exec_1_0_03,
     "1.0-04": Exec_1_0_04,
+    "1.0-05": Exec_1_0_05,
     "1.0-06": Exec_1_0_06,
 
     "2.0-01": Exec_2_0_01,
@@ -120,6 +125,9 @@ EXECUTOR_REGISTRY: Dict[str, Type[Auditable]] = {
     "5.0-05": Exec_5_0_05,
     "5.0-06": Exec_5_0_06,
 
+    "6.0-01": Exec_6_0_01,
+    "6.0-02": Exec_6_0_02,
+    "6.0-03": Exec_6_0_03,
     "6.0-04": Exec_6_0_04,
 
     "7.0-01": Exec_7_0_01,
