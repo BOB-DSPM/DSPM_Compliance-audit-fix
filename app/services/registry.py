@@ -56,6 +56,8 @@ from app.services.executors.map_4_0_05_macie_jobs import Exec_4_0_05
 from app.services.executors.map_6_0_04_inspector2_coverage import Exec_6_0_04
 from app.services.executors.map_8_0_07_network_firewall import Exec_8_0_07
 from app.services.executors.map_10_0_01_secrets_rotation import Exec_10_0_01
+from app.services.executors.map_9_0_07_dlm_policies import Exec_9_0_07
+
 
 class Auditable(Protocol):
     code: str
@@ -114,6 +116,8 @@ EXECUTOR_REGISTRY: Dict[str, Type[Auditable]] = {
     "8.0-01": Exec_8_0_01,
     "8.0-03":  Exec_8_0_03,
     "8.0-07": Exec_8_0_07,
+
+    "9.0-07": Exec_9_0_07,
 
     "10.0-01": Exec_10_0_01,
     "10.0-04": Exec_10_0_04,
