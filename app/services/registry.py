@@ -57,6 +57,17 @@ from app.services.executors.map_6_0_04_inspector2_coverage import Exec_6_0_04
 from app.services.executors.map_8_0_07_network_firewall import Exec_8_0_07
 from app.services.executors.map_10_0_01_secrets_rotation import Exec_10_0_01
 from app.services.executors.map_9_0_07_dlm_policies import Exec_9_0_07
+from app.services.executors.map_5_0_03_sm_experiments import Exec_5_0_03
+from app.services.executors.map_5_0_04_sm_feature_store import Exec_5_0_04
+from app.services.executors.map_9_0_01_ddb_pitr import Exec_9_0_01
+from app.services.executors.map_9_0_02_rds_multiaz import Exec_9_0_02
+from app.services.executors.map_9_0_03_backup_copy_rules import Exec_9_0_03
+from app.services.executors.map_12_0_04_s3_bucket_policy_org_only import Exec_12_0_04
+from app.services.executors.map_12_0_01_privatelink_interface_endpoints import Exec_12_0_01
+from app.services.executors.map_1_0_04_iam_password_policy import Exec_1_0_04
+from app.services.executors.map_12_0_02_datasync_tasks import Exec_12_0_02
+from app.services.executors.map_9_0_04_s3_replication import Exec_9_0_04
+
 
 
 class Auditable(Protocol):
@@ -69,6 +80,7 @@ EXECUTOR_REGISTRY: Dict[str, Type[Auditable]] = {
     "1.0-01": Exec_1_0_01,
     "1.0-02": Exec_1_0_02,
     "1.0-03": Exec_1_0_03,
+    "1.0-04": Exec_1_0_04,
     "1.0-06": Exec_1_0_06,
 
     "2.0-01": Exec_2_0_01,
@@ -103,6 +115,8 @@ EXECUTOR_REGISTRY: Dict[str, Type[Auditable]] = {
 
     "5.0-01": Exec_5_0_01,
     "5.0-02": Exec_5_0_02,
+    "5.0-03": Exec_5_0_03,
+    "5.0-04": Exec_5_0_04,
     "5.0-05": Exec_5_0_05,
     "5.0-06": Exec_5_0_06,
 
@@ -114,9 +128,13 @@ EXECUTOR_REGISTRY: Dict[str, Type[Auditable]] = {
     "7.0-04": Exec_7_0_04,
 
     "8.0-01": Exec_8_0_01,
-    "8.0-03":  Exec_8_0_03,
+    "8.0-03": Exec_8_0_03,
     "8.0-07": Exec_8_0_07,
 
+    "9.0-01": Exec_9_0_01,
+    "9.0-02": Exec_9_0_02,
+    "9.0-03": Exec_9_0_03,
+    "9.0-04": Exec_9_0_04,
     "9.0-07": Exec_9_0_07,
 
     "10.0-01": Exec_10_0_01,
@@ -126,6 +144,9 @@ EXECUTOR_REGISTRY: Dict[str, Type[Auditable]] = {
     "11.0-02": Exec_11_0_02,
     "11.0-03": Exec_11_0_03,
 
+    "12.0-01": Exec_12_0_01,
+    "12.0-02": Exec_12_0_02,
+    "12.0-04": Exec_12_0_04,
     "12.0-05": Exec_12_0_05,
 
     "13.0-02": Exec_13_0_02,
