@@ -47,7 +47,15 @@ from app.services.executors.map_13_0_02_lf_tag_separation import Exec_13_0_02
 from app.services.executors.map_7_0_01_security_hub import Exec_7_0_01
 from app.services.executors.map_1_0_03_iam_credential_report import Exec_1_0_03
 from app.services.executors.map_3_0_02_ct_data_events import Exec_3_0_02
-
+from app.services.executors.map_3_0_03_config_recorder import Exec_3_0_03
+from app.services.executors.map_7_0_03_cw_alarms import Exec_7_0_03
+from app.services.executors.map_8_0_01_sg_no_public_ingress import Exec_8_0_01
+from app.services.executors.map_5_0_02_glue_data_quality import Exec_5_0_02
+from app.services.executors.map_5_0_01_databrew_projects import Exec_5_0_01
+from app.services.executors.map_4_0_05_macie_jobs import Exec_4_0_05
+from app.services.executors.map_6_0_04_inspector2_coverage import Exec_6_0_04
+from app.services.executors.map_8_0_07_network_firewall import Exec_8_0_07
+from app.services.executors.map_10_0_01_secrets_rotation import Exec_10_0_01
 
 class Auditable(Protocol):
     code: str
@@ -78,6 +86,7 @@ EXECUTOR_REGISTRY: Dict[str, Type[Auditable]] = {
 
     "3.0-01": Exec_3_0_01,
     "3.0-02": Exec_3_0_02,
+    "3.0-03": Exec_3_0_03,
     "3.0-04": Exec_3_0_04,
     "3.0-07": Exec_3_0_07,
     "3.0-08": Exec_3_0_08,
@@ -88,16 +97,25 @@ EXECUTOR_REGISTRY: Dict[str, Type[Auditable]] = {
     "4.0-02": Exec_4_0_02,
     "4.0-03": Exec_4_0_03,
     "4.0-04": Exec_4_0_04,
+    "4.0-05": Exec_4_0_05,
 
+    "5.0-01": Exec_5_0_01,
+    "5.0-02": Exec_5_0_02,
     "5.0-05": Exec_5_0_05,
     "5.0-06": Exec_5_0_06,
 
+    "6.0-04": Exec_6_0_04,
+
     "7.0-01": Exec_7_0_01,
     "7.0-02": Exec_7_0_02,
+    "7.0-03": Exec_7_0_03,
     "7.0-04": Exec_7_0_04,
 
+    "8.0-01": Exec_8_0_01,
     "8.0-03":  Exec_8_0_03,
+    "8.0-07": Exec_8_0_07,
 
+    "10.0-01": Exec_10_0_01,
     "10.0-04": Exec_10_0_04,
 
     "11.0-01": Exec_11_0_01,
