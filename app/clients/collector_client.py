@@ -6,7 +6,7 @@ from app.core.config import settings
 
 class CollectorClient:
     def __init__(self, base_url: Optional[str] = None):
-        self.base_url: str = base_url or "http://localhost:8000"
+        self.base_url: str = base_url or "http://211.44.183.248:9000/collector"
         self._client = httpx.Client(timeout=30.0)
 
     # ---- 목록 API (필요 시 확장) ----

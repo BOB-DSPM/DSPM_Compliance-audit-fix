@@ -71,6 +71,7 @@ from app.services.executors.map_6_0_01_sagemaker_endpoints import Exec_6_0_01
 from app.services.executors.map_6_0_02_sagemaker_model_monitor import Exec_6_0_02
 from app.services.executors.map_6_0_03_ecr_scan_on_push import Exec_6_0_03
 from app.services.executors.map_1_0_05_access_analyzer import Exec_1_0_05
+from app.services.executors.map_8_0_05_route53_dns_firewall import Exec_8_0_05
 
 
 
@@ -137,6 +138,7 @@ EXECUTOR_REGISTRY: Dict[str, Type[Auditable]] = {
 
     "8.0-01": Exec_8_0_01,
     "8.0-03": Exec_8_0_03,
+    "8.0-05": Exec_8_0_05,
     "8.0-07": Exec_8_0_07,
 
     "9.0-01": Exec_9_0_01,
