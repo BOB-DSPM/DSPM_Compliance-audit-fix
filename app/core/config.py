@@ -8,9 +8,9 @@ from typing import List
 class Settings(BaseSettings):
     # ---- Gateway 경유 베이스 URL (프리픽스 포함) ----
     # 기존: http://localhost:8003  → 게이트웨이: http://211.44.183.248:9000/compliance
-    MAPPING_BASE_URL: AnyHttpUrl | str = "http://211.44.183.248:9000/compliance"
+    MAPPING_BASE_URL: AnyHttpUrl | str = "http://211.44.183.248:8003"
     # 기존: http://localhost:8000  → 게이트웨이: http://211.44.183.248:9000/collector
-    COLLECTOR_BASE_URL: AnyHttpUrl | str = "http://211.44.183.248:9000/collector"
+    COLLECTOR_BASE_URL: AnyHttpUrl | str = "http://211.44.183.248:8000"
 
     # (참고) 다른 서비스도 필요하면 이렇게 추가하면 됩니다:
     # AUDITOR_BASE_URL: AnyHttpUrl | str = "http://211.44.183.248:9000/auditor"

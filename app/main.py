@@ -6,6 +6,7 @@ import os
 
 app = FastAPI(title="Compliance Mapping Auditor API", version="0.1.0")
 
+
 # ── CORS 설정 ────────────────────────────────────────────────────────────────
 # 개발 기본(Next/Vite dev) + Swagger 로컬 확인
 DEFAULT_ORIGINS = [
@@ -27,10 +28,11 @@ app.add_middleware(
     allow_credentials=False,          # 쿠키/세션/인증 포함 요청 지원
     allow_methods=["*"],             # 필요시 ["GET","POST","PUT","DELETE","OPTIONS"]
     allow_headers=["*"],             # Authorization, Content-Type 등
-    expose_headers=["ETag"],         # 프론트에서 읽어야 하는 응답 헤더 있으면 추가
-    max_age=86400,                   # 프리플라이트 캐시(초)
+    # expose_headers=["ETag"],         # 프론트에서 읽어야 하는 응답 헤더 있으면 추가
+    # max_age=86400,                   # 프리플라이트 캐시(초)
 )
 # ────────────────────────────────────────────────────────────────────────────
 
+
 app.include_router(health.router, prefix="/health", tags=["health"])
-app.include_router(audit.router,  prefix="/audit",  tags=["audit"])
+app.include_router(audit.router,  prefix="/audit",  tags=["audit"])       
