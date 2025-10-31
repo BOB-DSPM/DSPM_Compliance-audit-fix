@@ -9,15 +9,26 @@ from app.services.audit_service import AuditService
 from app.core.config import settings
 from app.core.session import ensure_session, use_session
 
-# ⬇ 세션 TTL 캐시 + ETag 유틸 (이미 추가해둔 유틸을 사용)
+# ⬇ 세션 TTL 캐시 + ETag 유틸
 from app.utils.caching import maybe_return_cached, store_response_to_cache
 from app.utils.etag_utils import etag_response
-from app.utils.session_introspect import peek_session as _peek_session, list_sessions as _list_sessions
+
+# ⬇ 세션 조회/요약
+from app.utils.session_introspect import (
+    peek_session as _peek_session,
+    list_sessions as _list_sessions,
+)
+
+# ⬇ 세션에 프레임워크 사용 흔적 태깅
+from app.utils.session_mark import mark_session_framework
 
 router = APIRouter()
 
+
 @router.get("/session", summary="세션 목록 또는 단건 조회(쿼리)")
-def session_overview(session_id: str | None = Query(None, description="조회할 세션 ID(없으면 전체 요약)")):
+def session_overview(
+    session_id: str | None = Query(None, description="조회할 세션 ID(없으면 전체 요약)")
+):
     """
     - session_id가 주어지면: 해당 세션 존재 여부와 요약 정보 반환
     - 없으면: 모든 세션의 요약 목록 반환
@@ -33,6 +44,7 @@ def session_get(session_id: str = Path(..., description="세션 ID")):
     특정 세션 존재 여부와 요약 정보를 반환.
     """
     return _peek_session(session_id)
+
 
 @router.post("/{framework}/_all", summary="(프레임워크) 전체 감사 수행")
 async def audit_framework(
@@ -63,8 +75,12 @@ async def audit_framework(
         if not session_id:
             result = svc.audit_compliance(framework)
         else:
-            s = ensure_session(session_id, region=settings.AWS_REGION, profile=None, ttl_seconds=session_ttl)
+            s = ensure_session(
+                session_id, region=settings.AWS_REGION, profile=None, ttl_seconds=session_ttl
+            )
             with use_session(s):
+                # 세션이 어떤 프레임워크에 사용되는지 기록
+                mark_session_framework(s, framework)
                 result = svc.audit_compliance(framework)
 
         # 3) 캐시에 저장 + ETag/Cache-Control
@@ -76,57 +92,89 @@ async def audit_framework(
     # 스트리밍 모드: 기존 NDJSON 흐름 유지 (캐시/ETag 제외)
     # ─────────────────────────────────────────────────────
     if not session_id:
+
         def gen_ndjson_no_session():
             reqs = svc.mapping_client.get_requirements(framework)
             total = len(reqs)
-            yield json.dumps({"type": "meta", "framework": framework, "total": total}, ensure_ascii=False) + "\n"
+            yield (
+                json.dumps({"type": "meta", "framework": framework, "total": total}, ensure_ascii=False)
+                + "\n"
+            )
             executed = 0
             for r in reqs:
                 res = svc.audit_requirement(framework, r.id)
                 executed += 1
-                yield json.dumps(
-                    {
-                        "type": "requirement",
-                        "framework": res.framework,
-                        "requirement_id": res.requirement_id,
-                        "item_code": res.item_code,
-                        "requirement_status": res.requirement_status,
-                        "summary": res.summary,
-                        "results": [rr.dict() for rr in res.results],
-                    },
+                yield (
+                    json.dumps(
+                        {
+                            "type": "requirement",
+                            "framework": res.framework,
+                            "requirement_id": res.requirement_id,
+                            "item_code": res.item_code,
+                            "requirement_status": res.requirement_status,
+                            "summary": res.summary,
+                            "results": [rr.dict() for rr in res.results],
+                        },
+                        ensure_ascii=False,
+                    )
+                    + "\n"
+                )
+            yield (
+                json.dumps(
+                    {"type": "summary", "framework": framework, "executed": executed, "total": total},
                     ensure_ascii=False,
-                ) + "\n"
-            yield json.dumps({"type": "summary", "framework": framework, "executed": executed, "total": total}, ensure_ascii=False) + "\n"
+                )
+                + "\n"
+            )
 
-        return StreamingResponse(gen_ndjson_no_session(), media_type="application/x-ndjson; charset=utf-8")
+        return StreamingResponse(
+            gen_ndjson_no_session(), media_type="application/x-ndjson; charset=utf-8"
+        )
 
     # 세션 모드 스트리밍
     s = ensure_session(session_id, region=settings.AWS_REGION, profile=None, ttl_seconds=session_ttl)
 
     def gen_ndjson_with_session():
         with use_session(s):
+            # 스트리밍 시작 시에도 프레임워크 태깅
+            mark_session_framework(s, framework)
+
             reqs = svc.mapping_client.get_requirements(framework)
             total = len(reqs)
-            yield json.dumps({"type": "meta", "framework": framework, "total": total}, ensure_ascii=False) + "\n"
+            yield (
+                json.dumps({"type": "meta", "framework": framework, "total": total}, ensure_ascii=False)
+                + "\n"
+            )
             executed = 0
             for r in reqs:
                 res = svc.audit_requirement(framework, r.id)
                 executed += 1
-                yield json.dumps(
-                    {
-                        "type": "requirement",
-                        "framework": res.framework,
-                        "requirement_id": res.requirement_id,
-                        "item_code": res.item_code,
-                        "requirement_status": res.requirement_status,
-                        "summary": res.summary,
-                        "results": [rr.dict() for rr in res.results],
-                    },
+                yield (
+                    json.dumps(
+                        {
+                            "type": "requirement",
+                            "framework": res.framework,
+                            "requirement_id": res.requirement_id,
+                            "item_code": res.item_code,
+                            "requirement_status": res.requirement_status,
+                            "summary": res.summary,
+                            "results": [rr.dict() for rr in res.results],
+                        },
+                        ensure_ascii=False,
+                    )
+                    + "\n"
+                )
+            yield (
+                json.dumps(
+                    {"type": "summary", "framework": framework, "executed": executed, "total": total},
                     ensure_ascii=False,
-                ) + "\n"
-            yield json.dumps({"type": "summary", "framework": framework, "executed": executed, "total": total}, ensure_ascii=False) + "\n"
+                )
+                + "\n"
+            )
 
-    return StreamingResponse(gen_ndjson_with_session(), media_type="application/x-ndjson; charset=utf-8")
+    return StreamingResponse(
+        gen_ndjson_with_session(), media_type="application/x-ndjson; charset=utf-8"
+    )
 
 
 @router.post("/audit/{framework}/{req_id:int}", summary="(항목) 감사 수행")
@@ -155,6 +203,8 @@ async def audit_requirement(
     else:
         s = ensure_session(session_id, region=settings.AWS_REGION, profile=None, ttl_seconds=session_ttl)
         with use_session(s):
+            # 단건 감사에서도 프레임워크 태깅
+            mark_session_framework(s, framework)
             result = svc.audit_requirement(framework, req_id)
 
     # 3) 캐시에 저장 + ETag/Cache-Control
