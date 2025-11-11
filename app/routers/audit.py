@@ -1,213 +1,96 @@
 # app/routers/audit.py
 from __future__ import annotations
 
-from fastapi import APIRouter, Path, Query, Request, Response
-from fastapi.responses import StreamingResponse
 import json
+import uuid
+from typing import Any, Dict, Generator, Optional
 
+from fastapi import APIRouter, Request, Response
+from fastapi.responses import StreamingResponse, JSONResponse, PlainTextResponse
+
+from app.core.session import get_or_create_session, use_session
 from app.services.audit_service import AuditService
-from app.core.config import settings
-from app.core.session import ensure_session, use_session
-
-# ⬇ 세션 TTL 캐시 + ETag 유틸
-from app.utils.caching import maybe_return_cached, store_response_to_cache
-from app.utils.etag_utils import etag_response
-
-# ⬇ 세션 조회/요약
-from app.utils.session_introspect import (
-    peek_session as _peek_session,
-    list_sessions as _list_sessions,
-)
-
-# ⬇ 세션에 프레임워크 사용 흔적 태깅
+from app.utils.session_introspect import peek_session
 from app.utils.session_mark import mark_session_framework
 
 router = APIRouter()
 
+AUDIT = AuditService()
 
-@router.get("/session", summary="세션 목록 또는 단건 조회(쿼리)")
-def session_overview(
-    session_id: str | None = Query(None, description="조회할 세션 ID(없으면 전체 요약)")
-):
-    """
-    - session_id가 주어지면: 해당 세션 존재 여부와 요약 정보 반환
-    - 없으면: 모든 세션의 요약 목록 반환
-    """
-    if session_id:
-        return _peek_session(session_id)
-    return _list_sessions()
+def _normalize_session_id(raw: Optional[str]) -> str:
+  if not raw:
+    return str(uuid.uuid4())
+  try:
+    return str(uuid.UUID(str(raw)))
+  except Exception:
+    return str(uuid.uuid4())
 
+@router.get("/session/{session_id}")
+def get_session(session_id: str):
+  """
+  프론트 확인용 세션 조회 엔드포인트 (complianceApi.checkSession에서 사용)
+  """
+  info = peek_session(session_id)
+  if not info.get("exists"):
+    return JSONResponse({"exists": False}, status_code=404)
+  return JSONResponse(info)
 
-@router.get("/session/{session_id}", summary="세션 단건 조회(존재 확인)")
-def session_get(session_id: str = Path(..., description="세션 ID")):
-    """
-    특정 세션 존재 여부와 요약 정보를 반환.
-    """
-    return _peek_session(session_id)
+@router.post("/{framework}/_all")
+async def audit_all(framework: str, request: Request):
+  """
+  프레임워크 전체 감사.
+  - query: stream=true -> NDJSON 스트리밍
+  - query: stream=false(default) -> 일괄 JSON
+  - query: session_id=<uuid>
+  """
+  qp = dict(request.query_params)
+  stream = str(qp.get("stream", "false")).lower() == "true"
+  raw_sid = qp.get("session_id")
+  sid = _normalize_session_id(raw_sid)
+  session = get_or_create_session(sid)
+  mark_session_framework(session, framework)
 
+  if not stream:
+    # 배치 모드(일괄 JSON)
+    with use_session(session):
+      data = AUDIT.audit_compliance(framework)
+    return JSONResponse(data)
 
-@router.post("/{framework}/_all", summary="(프레임워크) 전체 감사 수행")
-async def audit_framework(
-    framework: str = Path(..., description="예: ISMS-P / GDPR / iso-27001"),
-    stream: bool = Query(False, description="True면 NDJSON으로 항목별 스트리밍 전송"),
-    session_id: str | None = Query(None, description="세션 ID(있으면 boto3/httpx 재사용)"),
-    session_ttl: int = Query(600, ge=0, description="세션 TTL(초). 0이면 만료 관리 안함"),
-    request: Request = None,
-    response: Response = None,
-):
-    """
-    - stream=False: JSON 한 방 응답 → 캐시/ETag 적용
-    - stream=True : NDJSON 스트리밍 → 캐시/ETag 미적용
-    """
-    framework = framework.strip()
-    svc = AuditService()
+  # 스트리밍(NDJSON) 모드
+  def gen_ndjson_with_session() -> Generator[bytes, None, None]:
+    # 메타(총 개수) 먼저 송신
+    with use_session(session):
+      # 각 요구사항을 순차 처리하는 로직을 AuditService 내부에서 재사용
+      batch = AUDIT.audit_compliance(framework)
+    total = int(batch.get("total_requirements", 0))
+    yield (json.dumps({"type": "meta", "framework": framework, "total": total}, ensure_ascii=False) + "\n").encode("utf-8")
 
-    # ─────────────────────────────────────────────────────
-    # 비스트리밍 모드: 캐시/ETag 경로 (세션 유무와 무관)
-    # ─────────────────────────────────────────────────────
-    if not stream:
-        # 1) 캐시 조회 (?refresh=1 이면 BYPASS)
-        cached = await maybe_return_cached(request, response, ttl=600)
-        if cached is not None:
-            return etag_response(request, response, cached)
+    # 다시 세션 컨텍스트에서 각 결과를 흘려보냄
+    with use_session(session):
+      for item in batch.get("results", []):
+        req_id = item.get("requirement_id")
+        status = item.get("requirement_status")
+        evt = {"type": "requirement", "framework": framework, "requirement_id": req_id, "requirement_status": status, **item}
+        yield (json.dumps(evt, ensure_ascii=False) + "\n").encode("utf-8")
 
-        # 2) 실제 실행
-        if not session_id:
-            result = svc.audit_compliance(framework)
-        else:
-            s = ensure_session(
-                session_id, region=settings.AWS_REGION, profile=None, ttl_seconds=session_ttl
-            )
-            with use_session(s):
-                # 세션이 어떤 프레임워크에 사용되는지 기록
-                mark_session_framework(s, framework)
-                result = svc.audit_compliance(framework)
+      # 요약 (선택)
+      summary_evt = {"type": "summary", "framework": framework}
+      yield (json.dumps(summary_evt, ensure_ascii=False) + "\n").encode("utf-8")
 
-        # 3) 캐시에 저장 + ETag/Cache-Control
-        store_response_to_cache(request, result)
-        response.headers["Cache-Control"] = "public, max-age=600"
-        return etag_response(request, response, result)
+  headers = {"Content-Type": "application/x-ndjson; charset=utf-8"}
+  return StreamingResponse(gen_ndjson_with_session(), headers=headers)
 
-    # ─────────────────────────────────────────────────────
-    # 스트리밍 모드: 기존 NDJSON 흐름 유지 (캐시/ETag 제외)
-    # ─────────────────────────────────────────────────────
-    if not session_id:
+@router.post("/audit/{framework}/{req_id}")
+async def audit_one(framework: str, req_id: int, request: Request):
+  """
+  특정 요구사항 감사 (JSON)
+  - query: session_id=<uuid>
+  """
+  raw_sid = request.query_params.get("session_id")
+  sid = _normalize_session_id(raw_sid)
+  session = get_or_create_session(sid)
+  mark_session_framework(session, framework)
 
-        def gen_ndjson_no_session():
-            reqs = svc.mapping_client.get_requirements(framework)
-            total = len(reqs)
-            yield (
-                json.dumps({"type": "meta", "framework": framework, "total": total}, ensure_ascii=False)
-                + "\n"
-            )
-            executed = 0
-            for r in reqs:
-                res = svc.audit_requirement(framework, r.id)
-                executed += 1
-                yield (
-                    json.dumps(
-                        {
-                            "type": "requirement",
-                            "framework": res.framework,
-                            "requirement_id": res.requirement_id,
-                            "item_code": res.item_code,
-                            "requirement_status": res.requirement_status,
-                            "summary": res.summary,
-                            "results": [rr.dict() for rr in res.results],
-                        },
-                        ensure_ascii=False,
-                    )
-                    + "\n"
-                )
-            yield (
-                json.dumps(
-                    {"type": "summary", "framework": framework, "executed": executed, "total": total},
-                    ensure_ascii=False,
-                )
-                + "\n"
-            )
-
-        return StreamingResponse(
-            gen_ndjson_no_session(), media_type="application/x-ndjson; charset=utf-8"
-        )
-
-    # 세션 모드 스트리밍
-    s = ensure_session(session_id, region=settings.AWS_REGION, profile=None, ttl_seconds=session_ttl)
-
-    def gen_ndjson_with_session():
-        with use_session(s):
-            # 스트리밍 시작 시에도 프레임워크 태깅
-            mark_session_framework(s, framework)
-
-            reqs = svc.mapping_client.get_requirements(framework)
-            total = len(reqs)
-            yield (
-                json.dumps({"type": "meta", "framework": framework, "total": total}, ensure_ascii=False)
-                + "\n"
-            )
-            executed = 0
-            for r in reqs:
-                res = svc.audit_requirement(framework, r.id)
-                executed += 1
-                yield (
-                    json.dumps(
-                        {
-                            "type": "requirement",
-                            "framework": res.framework,
-                            "requirement_id": res.requirement_id,
-                            "item_code": res.item_code,
-                            "requirement_status": res.requirement_status,
-                            "summary": res.summary,
-                            "results": [rr.dict() for rr in res.results],
-                        },
-                        ensure_ascii=False,
-                    )
-                    + "\n"
-                )
-            yield (
-                json.dumps(
-                    {"type": "summary", "framework": framework, "executed": executed, "total": total},
-                    ensure_ascii=False,
-                )
-                + "\n"
-            )
-
-    return StreamingResponse(
-        gen_ndjson_with_session(), media_type="application/x-ndjson; charset=utf-8"
-    )
-
-
-@router.post("/audit/{framework}/{req_id:int}", summary="(항목) 감사 수행")
-async def audit_requirement(
-    framework: str = Path(..., description="예: ISMS-P / GDPR / iso-27001"),
-    req_id: int = Path(..., description="매핑 백엔드의 requirement.id"),
-    session_id: str | None = Query(None, description="세션 ID(있으면 boto3/httpx 재사용)"),
-    session_ttl: int = Query(600, ge=0, description="세션 TTL(초). 0이면 만료 관리 안함"),
-    request: Request = None,
-    response: Response = None,
-):
-    """
-    단일 항목 감사는 항상 한 방 JSON 응답 → 캐시/ETag 적용
-    """
-    framework = framework.strip()
-    svc = AuditService()
-
-    # 1) 캐시 조회
-    cached = await maybe_return_cached(request, response, ttl=600)
-    if cached is not None:
-        return etag_response(request, response, cached)
-
-    # 2) 실제 실행
-    if not session_id:
-        result = svc.audit_requirement(framework, req_id)
-    else:
-        s = ensure_session(session_id, region=settings.AWS_REGION, profile=None, ttl_seconds=session_ttl)
-        with use_session(s):
-            # 단건 감사에서도 프레임워크 태깅
-            mark_session_framework(s, framework)
-            result = svc.audit_requirement(framework, req_id)
-
-    # 3) 캐시에 저장 + ETag/Cache-Control
-    store_response_to_cache(request, result)
-    response.headers["Cache-Control"] = "public, max-age=600"
-    return etag_response(request, response, result)
+  with use_session(session):
+    result = AUDIT.audit_requirement(framework, int(req_id))
+  return JSONResponse(result.dict())
