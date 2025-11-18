@@ -20,6 +20,11 @@ Collector(리소스 수집기)와 Mapping(매핑 메타 API)을 호출하거나,
 
 ### 설치 및 실행
 ```bash
+
+# 0. 가상환경 설정 (권장)
+python3 -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+
 # 1. 의존성 설치
 pip install -r requirements.txt
 
@@ -197,4 +202,3 @@ from pydantic_settings import BaseSettings
 1. `.env` 파일의 URL 확인
 2. 해당 서비스가 실행 중인지 확인
 3. Collector 없이도 boto3 폴백으로 동작 가능
-
