@@ -134,6 +134,62 @@ curl -s -X POST http://localhost:8103/audit/iso-27017/_all | jq
 | MAPPING_BASE_URL | 매핑 API URL | http://localhost:8003 |
 | COLLECTOR_BASE_URL | 수집기 API URL | http://localhost:8000 |
 
+## AWS Marketplace 컨테이너 요구 사항 대응
+
+- **보안**: `python:3.12-slim` 베이스와 최소 패키지만 사용하고, 컨테이너는 비루트 사용자(`appuser`)로 실행됩니다. `.dockerignore`에 `.aws/` 등을 포함해 로컬 자격 증명이 이미지에 포함되지 않도록 했습니다.
+- **헬스체크/가용성**: `uvicorn` 엔트리포인트와 `/health` 헬스체크를 Dockerfile에 정의하여 Marketplace 요구 사항 중 “완전한 제품” 조건을 충족합니다.
+- **로그/데이터**: 감사 결과만 응답에 포함하며 결제 정보나 고객 식별자를 수집하지 않습니다.
+- **자격증명**: AWS 서비스 접근은 컨테이너 내부에서 자격 증명을 요청하지 않고, IAM 역할(예: IRSA, ECS Task Role)을 통해 자동으로 주입된 임시 자격 증명에만 의존합니다. 장기 키를 하드코딩하거나 이미지에 포함하는 것은 금지합니다.
+
+### 권장 권한 주입 방법
+
+Amazon EKS(IRSA) 예시:
+
+```yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: dspm-audit
+  namespace: compliance
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::<ACCOUNT_ID>:role/DspmAuditRole
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dspm-audit
+spec:
+  template:
+    spec:
+      serviceAccountName: dspm-audit
+      containers:
+        - name: api
+          image: <ECR>/dspm-audit:latest
+          env:
+            - name: AWS_REGION
+              value: ap-northeast-2
+```
+
+Amazon ECS/Fargate 예시:
+
+```json
+{
+  "family": "dspm-audit",
+  "taskRoleArn": "arn:aws:iam::<ACCOUNT_ID>:role/DspmAuditTaskRole",
+  "executionRoleArn": "arn:aws:iam::<ACCOUNT_ID>:role/ecsTaskExecutionRole",
+  "containerDefinitions": [
+    {
+      "name": "api",
+      "image": "<ECR>/dspm-audit:latest",
+      "portMappings": [{ "containerPort": 8103 }],
+      "environment": [{ "name": "AWS_REGION", "value": "ap-northeast-2" }]
+    }
+  ]
+}
+```
+
+추가 체크리스트와 제출 단계는 `docs/aws-marketplace.md`에서 확인할 수 있습니다.
+
 ## 새 매핑 추가 방법
 
 ### 1. Executor 파일 생성

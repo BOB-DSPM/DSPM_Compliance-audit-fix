@@ -1,0 +1,9 @@
+.git
+.gitignore
+.venv
+.aws/
+__pycache__/
+*.py[cod]
+.mypy_cache/
+.pytest_cache/
+.DS_Store
